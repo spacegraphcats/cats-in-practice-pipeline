@@ -32,12 +32,18 @@ acido/long-contigs.sig: acido/cdbg.gxt
 acido/acido.fa.gz.sig: data/acido.fa.gz
 	sourmash compute -k 31 --scaled 5000 data/acido.fa.gz -o acido/acido.fa.gz.sig
 
-output/frontier.02.sig: acido/long-contigs.sig 15genome/minhashes.db
+output/frontier.p25.sig: acido/long-contigs.sig 15genome/minhashes.db
 	-mkdir output
-	python -m search.frontier_search acido/long-contigs.sig 15genome 0.0 -o output/frontier.00.sig
-	python -m search.frontier_search acido/long-contigs.sig 15genome 0.1 -o output/frontier.01.sig
-	python -m search.frontier_search acido/long-contigs.sig 15genome 0.2 -o output/frontier.02.sig
+	python -m search.frontier_search acido/long-contigs.sig 15genome 0.0 -o output/frontier.p00.sig
+	python -m search.frontier_search acido/long-contigs.sig 15genome 0.05 -o output/frontier.p05.sig
+	python -m search.frontier_search acido/long-contigs.sig 15genome 0.1 -o output/frontier.p10.sig
+	python -m search.frontier_search acido/long-contigs.sig 15genome 0.15 -o output/frontier.p15.sig
+	python -m search.frontier_search acido/long-contigs.sig 15genome 0.2 -o output/frontier.p20.sig
+	python -m search.frontier_search acido/long-contigs.sig 15genome 0.25 -o output/frontier.p25.sig
 
-do-acido-expand: 15genome/minhashes.db output/frontier.02.sig acido/acido.fa.gz.sig
+do-acido-expand: 15genome/minhashes.db output/frontier.p25.sig acido/acido.fa.gz.sig
 	sourmash search acido/acido.fa.gz.sig output/frontier*.sig  acido/long-contigs.sig --containment -n 100
 	sourmash search acido/acido.fa.gz.sig output/frontier*.sig  acido/long-contigs.sig -n 100
+	scripts/frontier-containment-similarity.py acido/acido.fa.gz.sig output 0 0.05 .1 .15 .2 .25 -o output/acido-expand-frontier.csv
+
+acido-expand-frontier.csv: do-acido-expand
