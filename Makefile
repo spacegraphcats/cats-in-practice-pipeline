@@ -114,3 +114,69 @@ output/shew-OS185-f10.sig: shew-reads/catlas.csv \
 shew-strain-search: output/shew-OS185-f10.sig
 	sourmash search shew-reads/shewanella.fa.gz.sig output/shew-f00.sig output/shew-OS185-f*.sig -n 100 --containment
 	sourmash search shew-reads/shewanella.fa.gz.sig output/shew-f00.sig output/shew-OS185-f*.sig -n 100
+
+####
+
+#
+# akker-reads.fa.gz is a collection of reads from podar data
+# that maps to the Akkermansia muciniphilia genome via bwa aln.  This is
+# "real" (but subselected) data, with a known answer.
+#
+# akker-reads.abundtrim.gz is the k-mer abundance trimmed set of reads.
+# akkermansia.fa.gz is the reference genome.
+# akkermansia-YL44.fa.gz is the genome of the YL44 strain, ~60% similar @ k=31.
+
+# prepared reads -- this is here only for record keeping & never
+# needs to be done again.
+XXXakker-reads.abundtrim.gz: akker-reads.fa.gz
+	trim-low-abund.py -M 1e9 -k 31 akker-reads.fa.gz --gzip \
+		-o akker-reads.abundtrim.gz
+
+# download the prepared reads (32 MB) from OSF
+akker-reads.abundtrim.gz:
+	curl -L 'https://osf.io/dk7nb/?action=download' > akker-reads.abundtrim.gz
+
+# build cDBG
+akker-reads/cdbg.gxt: akker-reads.abundtrim.gz
+	python -m spacegraphcats.build_contracted_dbg -k 31 -M 4e9 akker-reads.abundtrim.gz -o akker-reads
+
+# build catlas
+akker-reads/catlas.csv: akker-reads/cdbg.gxt
+	python -m spacegraphcats.catlas akker-reads 1
+
+# build minhashes
+akker-reads/minhashes.db: akker-reads/catlas.csv akker-reads/contigs.fa.gz
+	python -m search.make_catlas_minhashes -k 31 --scaled=1000 akker-reads
+
+# download the akkermansia genome from OSF
+akker-reads/akkermansia.fa.gz:
+	mkdir -p akker-reads
+	curl -L 'https://osf.io/6u2ge/?action=download' > akker-reads/akkermansia.fa.gz
+
+# compute akkermansia genome signature
+akker-reads/akkermansia.fa.gz.sig: akker-reads/akkermansia.fa.gz
+	sourmash compute -k 31 --scaled=1000 akker-reads/akkermansia.fa.gz -o akker-reads/akkermansia.fa.gz.sig --name-from-first
+
+# download the Akkermansia muciniphilia YL44 (strain variant) genome, too.
+akker-reads/akkermansia-YL44.fa.gz:
+	mkdir -p akker-reads
+	curl -L 'https://osf.io/w93ak/?action=download' > akker-reads/akkermansia-YL44.fa.gz
+
+# compute YL44 genome signature
+akker-reads/akkermansia-YL44.fa.gz.sig: akker-reads/akkermansia-YL44.fa.gz
+	sourmash compute -k 31 --scaled=1000 akker-reads/akkermansia-YL44.fa.gz -o akker-reads/akkermansia-YL44.fa.gz.sig --name-from-first
+
+# do various searches
+output/akker-YL44-f10.sig: akker-reads/catlas.csv \
+	akker-reads/akkermansia-YL44.fa.gz.sig \
+	akker-reads/akkermansia.fa.gz.sig
+	python -m search.frontier_search akker-reads/akkermansia.fa.gz.sig akker-reads 0.0 --purgatory -o output/akker-f00.sig
+
+	python -m search.frontier_search akker-reads/akkermansia-YL44.fa.gz.sig akker-reads 0.0 --purgatory -o output/akker-YL44-f00.sig
+	python -m search.frontier_search akker-reads/akkermansia-YL44.fa.gz.sig akker-reads 0.1 --purgatory -o output/akker-YL44-f01.sig
+	python -m search.frontier_search akker-reads/akkermansia-YL44.fa.gz.sig akker-reads 0.5 --purgatory -o output/akker-YL44-f05.sig
+	python -m search.frontier_search akker-reads/akkermansia-YL44.fa.gz.sig akker-reads 1.0 --purgatory -o output/akker-YL44-f10.sig
+
+akker-strain-search: output/akker-YL44-f10.sig
+	sourmash search akker-reads/akkermansia.fa.gz.sig output/akker-f00.sig output/akker-YL44-f*.sig -n 100 --containment
+	sourmash search akker-reads/akkermansia.fa.gz.sig output/akker-f00.sig output/akker-YL44-f*.sig -n 100
